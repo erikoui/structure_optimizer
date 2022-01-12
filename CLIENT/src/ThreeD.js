@@ -261,7 +261,7 @@ const makeSolutionArray = (modelDb) => {
     }
     let nodesize = 0.3;
     let rodsize = 0.15;
-    let magnification=2500;
+    let magnification=25000;
     let d_factor=magnification-1;
     
     let mesh = [];

@@ -23,7 +23,8 @@ floor_heights = [0, 3, 6, 9, 12]  # for future use
 default_E = 3.0e11
 default_G = default_E/(2*(1+0.3))
 
-add_diaphragm=False
+add_diaphragm=True
+diaphragm_area=100;
 
 def main():
     # --------------------READ DXF------------------------
@@ -172,8 +173,8 @@ def main():
                 "x": False,
                 "y": False,
                 "z": False,
-                "xx": False,
-                "yy": False,
+                "xx": True,
+                "yy": True,
                 "zz": False
             }
         })
@@ -198,16 +199,16 @@ def main():
                     "from": i*2+1,
                     "to": j*2+1,
                     "udl": [0, 0, 0],
-                    "E": 100000,#default_E,
-                    "G": 100000,#default_G,
-                    "Ix": 100000,#0.0026,
-                    "Iy": 100000,#0.0006,
-                    "J": 100000,#0.027,
-                    "A": 100000,#0.12,
+                    "E": default_E,
+                    "G": default_G,
+                    "Ix": 0.001,#0.0026,
+                    "Iy": 0.001,#0.0006,
+                    "J": 0.002,#0.027,
+                    "A": 1,#0.12,
                     "length": 5
                 })
 
-    fe_model["FEnodes"][1]["forces"]["x"]=100000#testing
+    fe_model["FEnodes"][1]["moments"]["z"]=10000#testing
     f = open("./test_json.json", "w")
     f.write(json.dumps(fe_model))
     f.close()

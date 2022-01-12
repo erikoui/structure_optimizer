@@ -301,18 +301,30 @@ std::vector<MatrixXd> loadRotatedLocalStiffnessMatrices(json modelDb, int nMembe
         iy = Iy[i];
         jj = J[i];
 
-        K_local << e * a / l, 0, 0, 0, 0, 0, -e * a / l, 0, 0, 0, 0, 0,
-            0, 12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l, 0, 12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l,
-            0, 0, 12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0, 0, 0, -12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0,
-            0, 0, 0, g* jj / l, 0, 0, 0, 0, 0, -g * jj / l, 0, 0,
-            0, 0, -6 * e * iy / l / l, 0, 4 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 2 * e * iy / l, 0,
-            0, 6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l,
-            -e * a / l, 0, 0, 0, 0, 0, e* a / l, 0, 0, 0, 0, 0,
-            0, -12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l, 0, 12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l,
-            0, 0, -12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0, 0, 0, 12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0,
-            0, 0, 0, -g * jj / l, 0, 0, 0, 0, 0, g* jj / l, 0, 0,
-            0, 0, -6 * e * iy / l / l, 0, 2 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 4 * e * iy / l, 0,
-            0, 6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l;
+        // K_local << e * a / l,           0, 0, 0, 0, 0, -e * a / l, 0, 0, 0, 0, 0,
+        //             0       , 12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l, 0, 12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l,
+        //             0       , 0, 12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0, 0, 0, -12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0,
+        //             0       , 0, 0, g* jj / l, 0, 0, 0, 0, 0, -g * jj / l, 0, 0,
+        //             0       , 0, -6 * e * iy / l / l, 0, 4 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 2 * e * iy / l, 0,
+        //             0       , 6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l,
+        //             -e * a / l, 0, 0, 0, 0, 0, e* a / l, 0, 0, 0, 0, 0,
+        //             0       , -12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l, 0, 12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l,
+        //             0       , 0, -12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0, 0, 0, 12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0,
+        //             0       , 0, 0, -g * jj / l, 0, 0, 0, 0, 0, g* jj / l, 0, 0,
+        //             0       , 0, -6 * e * iy / l / l, 0, 2 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 4 * e * iy / l, 0,
+        //             0       , 6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l;
+         K_local << e * a / l,           0, 0, 0, 0, 0, -e * a / l, 0, 0, 0, 0, 0,
+                    0       , 12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l, 0, -12 * e * ix / l / l / l, 0, 0, 0, 6 * e * ix / l / l,
+                    0       , 0, 12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0, 0, 0, -12 * e * iy / l / l / l, 0, -6 * e * iy / l / l, 0,
+                    0       , 0, 0, g* jj / l, 0, 0, 0, 0, 0, -g * jj / l, 0, 0,
+                    0       , 0, -6 * e * iy / l / l, 0, 4 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 2 * e * iy / l, 0,
+                    0       , 6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l,
+                    -e * a / l, 0, 0, 0, 0, 0, e* a / l, 0, 0, 0, 0, 0,
+                    0       , -12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l, 0, 12 * e * ix / l / l / l, 0, 0, 0, -6 * e * ix / l / l,
+                    0       , 0, -12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0, 0, 0, 12 * e * iy / l / l / l, 0, 6 * e * iy / l / l, 0,
+                    0       , 0, 0, -g * jj / l, 0, 0, 0, 0, 0, g* jj / l, 0, 0,
+                    0       , 0, -6 * e * iy / l / l, 0, 2 * e * iy / l, 0, 0, 0, 6 * e * iy / l / l, 0, 4 * e * iy / l, 0,
+                    0       , 6 * e * ix / l / l, 0, 0, 0, 2 * e * ix / l, 0, -6 * e * ix / l / l, 0, 0, 0, 4 * e * ix / l;
 
         Matrix3d R = Rz[i] * Ry[i] * Rx[i];
         Matrix3d zeros = Matrix3d::Zero(3, 3);
