@@ -108,8 +108,14 @@ def main():
                 {'min': raw_min[i], 'prf': raw_prf[j], 'max': raw_max[k]})
     calc_column_data(columns)
     print(str(len(columns)) + ' Columns successfully parsed.')
-    # ----------------------------------------------------------------------------------------------
+    
+    make_json_for_client(columns)
 
+    
+
+
+# -----------------------FUNCTIONS------------------------
+def make_json_for_client(columns):
     # Conversion starts here
     col_prefix = "K"
     # nodes have integers as names
@@ -173,8 +179,8 @@ def main():
                 "x": False,
                 "y": False,
                 "z": False,
-                "xx": True,
-                "yy": True,
+                "xx": False,
+                "yy": False,
                 "zz": False
             }
         })
@@ -213,7 +219,6 @@ def main():
     f.write(json.dumps(fe_model))
     f.close()
 
-# -----------------------FUNCTIONS------------------------
 def calc_column_data(columns):
     for column in columns:
         column["centroid"] = Polygon(column['prf']).centroid

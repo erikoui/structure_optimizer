@@ -15,8 +15,10 @@
 # - put preferred column sizes in PREF
 # - put max in MAX and min in MIN
 
+from copy import copy
 import sys
 import math
+import random
 import matplotlib.pyplot as plt
 
 from ezdxf import recover, DXFStructureError
@@ -27,10 +29,13 @@ from shapely.geometry import Point, Polygon
 
 from section import CrossSection
 
+max_iters=100000
+pop_size=1000
+
 def main():
     # Safe loading procedure (requires ezdxf v0.14):
     try:
-        doc, auditor = recover.readfile('./DXF/C2.dxf')
+        doc, auditor = recover.readfile('./DXF/test.dxf')
     except IOError:
         print('Not a DXF file or a generic I/O error.')
         sys.exit(1)
@@ -59,15 +64,19 @@ def main():
     # TODO: Check if shapes have same number of points
 
     columns=[]
+    limits_exist=False
     print('Parsing columns...')
     if len(raw_prf)!=0 and len(raw_max)==0:
         print("No plines in MAX layer, assuming only prf columns are to be used.")
         for shape_prf in raw_prf:
+            for v in shape_prf:
+                v=list(v)
             columns.append({'min':shape_prf,'prf':shape_prf,'max':shape_prf})
     elif len(raw_prf)==0:
         print("FATAL: Error in dxf: No columns in prf layer. Exiting")
         sys.exit(3)
     else:
+        limits_exist=True
         min_prf_rel=dict()
         found_prf=[]
         prf_max_rel=dict()
@@ -75,6 +84,8 @@ def main():
         for i,shape_min in enumerate(raw_min):# find which preferred column each min belongs to
             found=False
             for j,shape_prf in enumerate(raw_prf):
+                for k,v in enumerate(raw_prf[j]):
+                    raw_prf[j][k]=list(raw_prf[j][k])
                 if polygon_inside_polygon(shape_min,shape_prf) and j not in found_prf:
                     min_prf_rel[i]=j
                     found_prf.append(j)
@@ -104,43 +115,50 @@ def main():
 
     print(str(len(columns)) +' Columns successfully parsed.')
     
-    calc_column_data(columns)
-    total_area=calc_total_area(columns)
-    center_of_mass=calc_global_com(columns)
-    center_of_rigidity=calc_global_cor(columns)
-    global_Ix=calc_global_Ix(columns,center_of_mass)
-    global_Iy=calc_global_Iy(columns,center_of_mass)
-    global_radius_gyration=math.sqrt(min(global_Iy,global_Ix)/total_area)
-    global_J=global_Ix+global_Iy
-    global_rx=math.sqrt(global_Ix/total_area)# torsional_radius_x
-    global_ry=math.sqrt(global_Iy/total_area)# torsional_radius_y
-    ex=abs(center_of_mass[0]-center_of_rigidity[0])# eccentricity
-    ey=abs(center_of_mass[1]-center_of_rigidity[1])# eccentricity
-    print("ex/rx:"+str(ex/global_rx))
-    print("ey/ry:"+str(ey/global_ry))
-    if(ex/global_rx<=0.3 and ey/global_ry<0.3):
-        print("eccentricity ok")
-    else:
-        print("eccentricity NOT ok")
-    print("rx:"+str(global_rx))
-    print("ry:"+str(global_ry))
-    print("floor Ix: "+str(global_Ix))
-    print("floor Iy: "+str(global_Iy))
-    print("Is:"+str(global_radius_gyration))
-    if(global_rx>=global_radius_gyration and global_ry>=global_radius_gyration):
-        print("Torsional radius OK")
-    else:
-        print("Torsional radius NOT OK")
-            
+    # make population
+    if(not limits_exist):
+        exit()
+    
+    population=[]
+    for i in range(1,pop_size):
+        population.append(make_random_layout(columns))
 
-    msp.add_line(center_of_mass,center_of_rigidity)
-    msp.add_line((0,0),(1,0))
-    msp.add_line((0,0),(0,1))
-    for i, column in enumerate(columns):
-        msp.add_text(str(i),dxfattribs={'height':0.5}).set_pos(column["prf"][0],align='RIGHT')
-    msp.add_text("COM",dxfattribs={'height':0.5}).set_pos(center_of_mass,align='MIDDLE')
-    msp.add_text("COR",dxfattribs={'height':0.5}).set_pos(center_of_rigidity,align='MIDDLE')
-    preview(doc)
+
+    preview_random_sample(population,doc)
+
+
+
+    for iter in range(1,max_iters):
+        for layout in population:
+            calc_column_data(columns)
+            total_area=calc_total_area(columns)
+            center_of_mass=calc_global_com(columns)
+            center_of_rigidity=calc_global_cor(columns)
+            global_Ix=calc_global_Ix(columns,center_of_mass)
+            global_Iy=calc_global_Iy(columns,center_of_mass)
+            global_radius_gyration=math.sqrt(min(global_Iy,global_Ix)/total_area)
+            global_J=global_Ix+global_Iy
+            global_rx=math.sqrt(global_Ix/total_area)# torsional_radius_x
+            global_ry=math.sqrt(global_Iy/total_area)# torsional_radius_y
+            ex=abs(center_of_mass[0]-center_of_rigidity[0])# eccentricity
+            ey=abs(center_of_mass[1]-center_of_rigidity[1])# eccentricity
+            print("ex/rx:"+str(ex/global_rx))
+            print("ey/ry:"+str(ey/global_ry))
+            score_to_minimize=ex/global_rx+ey/global_ry# this should also use Ix and Iy
+        
+def make_random_layout(columns):
+    copy_col=columns
+    for column in copy_col:
+        rand_index=math.floor(random.random()*len(column['prf']))
+        next_rand_index=(rand_index+1)%len(column['prf'])
+        rand_increment_1=math.floor(random.random()*10)*5/100
+        rand_increment_2=math.floor(random.random()*10)*5/100-0.5
+        column['prf'][rand_index][0]+=rand_increment_1
+        column['prf'][next_rand_index][0]+=rand_increment_1
+        column['prf'][rand_index][1]+=rand_increment_2
+        column['prf'][next_rand_index][1]+=rand_increment_2
+    return copy_col
+        
 
 def calc_column_data(columns):
     for column in columns:
@@ -249,6 +267,15 @@ def polygon_inside_polygon(s1,s2):
     p1=Polygon(s1)
     p2=Polygon(s2)
     return p2.covers(p1)
+
+def preview_random_sample(popu,doc):
+    msp = doc.modelspace()
+    col=popu[math.floor(random.random()*len(popu))]
+    for c in col:
+        for i,v in enumerate(c['prf']):
+
+            msp.add_line(v,c['prf'][(i+1)%len(c['prf'])])
+    preview(doc)
 
 # Display the drawing
 def preview(doc):
