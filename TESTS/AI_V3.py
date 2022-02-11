@@ -19,6 +19,7 @@ import os
 import math
 import random
 import matplotlib.pyplot as plt
+import numpy as np
 
 from ezdxf import recover, DXFStructureError
 from ezdxf.addons.drawing import RenderContext, Frontend
@@ -30,20 +31,22 @@ from copy import deepcopy
 
 # Can be 'GA' or 'AI'
 MODE='AI'
+# GA is broken btw
 
 #hyperparameters AI
-learn_rate=0.03
+learn_rate=0.1
 
 #hyperparameters GA
-pop_size=1000
-survivor_ratio=0.2
-mutation_ratio=0.02
+pop_size=3000
+survivor_ratio=1
+selection_ratio=0.1#how likely is for the first to be parents <1
+mutation_ratio=0.05
 
 #hyperparameters general
-max_iters=10000
-save_interval=math.ceil(max_iters/350)#Some error makes max images possible to save=355
-area_weight=100
-stiffness_weight=1
+max_iters=5000
+save_interval=math.ceil(max_iters/10)#Some error makes max images possible to save=355
+area_weight=0.001# How GOOD more area is
+stiffness_weight=0.1
 Ix_ratio=1# used to convert Ix to [0,1]
 Iy_ratio=1# used to convert Iy to [0,1]
 area_ratio=1# used to convert area to [0,1]
@@ -92,10 +95,11 @@ def calculate_ratios(columns):
     global Iy_ratio
     Iy_ratio=1/global_Iy
     global area_ratio
-    area_ratio=1/total_area
+    area_ratio=1/total_area**2
 
 # Calculates how good the structure is
-def error_func(columns,maxes,mines):
+def error_func(columns,maxes,mines,iter):
+    global minimum_loss
     centroids=[]
     areas=[]
     Ixs=[]
@@ -117,10 +121,10 @@ def error_func(columns,maxes,mines):
     global_Iy=calc_global_Iy(Iys,areas,centroids,center_of_mass)
     global_rx=math.sqrt(global_Ix/total_area)# torsional_radius_x
     global_ry=math.sqrt(global_Iy/total_area)# torsional_radius_y
-    ex=abs(center_of_mass[0]-center_of_rigidity[0])# eccentricity
-    ey=abs(center_of_mass[1]-center_of_rigidity[1])# eccentricity
+    ex=abs(center_of_mass[0]-center_of_rigidity[0])/global_rx# eccentricity
+    ey=abs(center_of_mass[1]-center_of_rigidity[1])/global_ry# eccentricity
 
-    score_to_minimize=((e_sig(ex)+e_sig(ey))/2)*(stiffness_weight*(global_Ix*Ix_ratio)*(global_Iy*Iy_ratio))/(total_area*area_ratio*area_weight)
+    score_to_minimize=((e_sig(ex)+e_sig(ey))/2)/sigmoid((stiffness_weight*(global_Ix*Ix_ratio+global_Iy*Iy_ratio)/2),1)/(total_area**2*area_ratio*area_weight)
 
     mse=score_to_minimize
     if(MODE=='AI'):
@@ -136,7 +140,7 @@ def error_func(columns,maxes,mines):
             score_to_minimize*=tf.cond(tf.less(c[1][0],mines[i][1][0]),lambda: tf.pow(tf.add(tf.abs(tf.subtract(c[1][0],mines[i][1][0])),+1.0),2),lambda: 1)
         
         mse=tf.reduce_mean([score_to_minimize])
-        print("Loss:",mse)
+        print("Iter "+str(iter)+" | Loss:",str(mse.numpy()),end='\r')
     return mse
     
 def sigmoid(x,a):
@@ -159,13 +163,12 @@ def run_gradient_descent(columns, learning_rate,maximums,minimums,doc):
     # Any values to be part of gradient calcs need to be vars/tensors
     tf_cols = tf.convert_to_tensor(columns, dtype='float32') 
     
-    # Hardcoding 25 iterations of gradient descent
-    for i in range(max_iters):
+    for i in range(max_iters+1):
 
         # Do all calculations under a "GradientTape" which tracks all gradients
         with tf.GradientTape() as tape:
             tape.watch(tf_cols)
-            loss = error_func(tf_cols,maximums,minimums)
+            loss = error_func(tf_cols,maximums,minimums,i)
 
         # Auto-diff magic!  Calcs gradients between loss calc and params
         dloss_dparams = tape.gradient(loss, tf_cols)
@@ -174,7 +177,7 @@ def run_gradient_descent(columns, learning_rate,maximums,minimums,doc):
         tf_cols = tf_cols - learning_rate * dloss_dparams
         if(i%save_interval==0):
             try:
-                save_columns_to_png(i,tf_cols,doc)
+                save_columns_to_png(i,tf_cols,doc,loss)
             except:
                 print("Could not save image")
 
@@ -292,14 +295,14 @@ def save_dxf(ezdxf_doc,filename):
     ezdxf_doc.saveas(filename)
 
 #save PNG (inglude .png in filename)
-def save_dxf_to_image(doc,filename):
+def save_dxf_to_image(doc,filename, loss):
     plt.close('all')
     fig = plt.figure()
     ax = fig.add_axes([0, 0, 1, 1])
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     Frontend(ctx, out).draw_layout(doc.modelspace(), finalize=True)
-    print('Saving image to ' + filename)
+    #print('Saving image to ' + filename +' (loss: '+str(loss)+')',end='\r')
     fig.savefig(filename, dpi=300)
 
 def preview_columns(col,doc):
@@ -313,14 +316,17 @@ def preview_columns(col,doc):
     for line in lines:
             msp.delete_entity(line)
 
-def save_columns_to_png(iter,cols,doc):
+def save_columns_to_png(iter,cols,doc,loss):
     msp = doc.modelspace()
     lines=[]
     for co in cols:
         c=gen_points(co)
         for i,v in enumerate(c):
             lines.append(msp.add_line(v,c[(i+1)%len(c)]))
-    save_dxf_to_image(doc,"iter"+str(iter)+".png")
+    try:
+        save_dxf_to_image(doc,"iter"+str(iter)+"_"+"{:.3g}".format(loss.numpy())+".png",loss)
+    except:
+        save_dxf_to_image(doc,"iter"+str(iter)+"_"+"{:.3g}".format(loss)+".png",loss)
     for line in lines:
         msp.delete_entity(line)
 
@@ -393,7 +399,7 @@ else:
 print(str(len(columns)) +' Columns successfully parsed.')
 
 calculate_ratios(columns)
-start_loss=error_func(columns,maximums,minimums)
+start_loss=error_func(columns,maximums,minimums,0)
 print("Starting loss:"+str(start_loss))
 
 
@@ -407,42 +413,50 @@ if(MODE=='GA'):
         randomize_layout(p['columns'],maximums,minimums)
 
     #reproduction
-    for iter in range(0,max_iters):
+    for iter in range(0,max_iters+1):
         for p in population:
-            loss=error_func(p['columns'],maximums,minimums)
+            loss=error_func(p['columns'],maximums,minimums,iter)
             p['score']=loss
         list.sort(population, key=lambda f:f['score'])
-        print("iteration "+str(iter)+"/"+str(max_iters)+": median score "+str(population[math.floor(len(population)*0.5)]['score']))
-        print("best score "+str(population[0]['score']))
+        print("iteration\t"+str(iter)+"/"+str(max_iters)+": median score "+"{:.3g}".format(population[math.floor(len(population)*0.5)]['score'])+"\tbest score "+"{:.3g}".format(population[0]['score'])+"              ",end='\r')
         population=population[:math.floor(len(population)*survivor_ratio)]
         if(iter%save_interval==0):
-            save_columns_to_png(iter,population[0]['columns'],doc)
+            save_columns_to_png(iter,population[0]['columns'],doc,population[0]['score'])
         next_gen=[]
         for i in range(pop_size):
             #breed
             indices=list(range(len(population[0]['columns'])))
-            random.shuffle(indices)
-            parent1=random.sample(list(range(len(population))),1)[0]
-            parent2=random.sample(list(range(len(population))),1)[0]
-            mini1=[population[parent1]['columns'][i] for i in indices[:math.floor(len(indices)/2)]]
-            mini2=[population[parent2]['columns'][i] for i in indices[math.floor(len(indices)/2):]]
-            mini1.extend(mini2)
-            #[1 3 4 2 5 8]
-            #[1 2 3 4 5 8]
-            # restore order of columns 
-            mini3=list(range(len(mini1)))
-            j=0
-            for index in indices:
-                mini3[index]=mini1[j]
-                j=j+1
+            parents=[]
+            mini3=[]
+            for j in range(len(population[0]['columns'])):
+                parents.append(math.floor(np.random.geometric(p=selection_ratio,size=len(population))[0]))
+            for index,p in enumerate(parents):
+                mini3.append(population[p]['columns'][index])
+            # random.shuffle(indices)
+
+            # parent1=math.floor(np.random.geometric(p=selection_ratio,size=len(population))[0])
+            # parent2=math.floor(np.random.geometric(p=selection_ratio,size=len(population))[0])
+            # while(parent2==parent1):
+            #     parent2=math.floor(np.random.geometric(p=selection_ratio,size=len(population))[0])
+            # mini1=[population[parent1]['columns'][i] for i in indices[:math.floor(len(indices)/2)]]
+            # mini2=[population[parent2]['columns'][i] for i in indices[math.floor(len(indices)/2):]]
+            # mini1.extend(mini2)
+            # #[1 3 4 2 5 8]
+            # #[1 2 3 4 5 8]
+            # # restore order of columns 
+            # mini3=list(range(len(mini1)))
+            # j=0
+            # for index in indices:
+            #     mini3[index]=mini1[j]
+            #     j=j+1
 
             next_gen.append({'columns':mini3})
             if(random.random()<mutation_ratio):
                 mutate(next_gen[-1]['columns'],maximums,minimums)
-        population=next_gen[:]
+        population=deepcopy(next_gen)
 
 elif(MODE=='AI'):
-    first_error=error_func(columns,maximums,minimums)
+    first_error=error_func(columns,maximums,minimums,0)
     run_gradient_descent(columns,learn_rate,maximums,minimums,doc)
 
 else:
