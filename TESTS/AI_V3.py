@@ -34,7 +34,7 @@ MODE='AI'
 # GA is broken btw
 
 #hyperparameters AI
-learn_rate=0.1
+learn_rate=0.005
 
 #hyperparameters GA
 pop_size=3000
@@ -43,9 +43,9 @@ selection_ratio=0.1#how likely is for the first to be parents <1
 mutation_ratio=0.05
 
 #hyperparameters general
-max_iters=5000
-save_interval=math.ceil(max_iters/10)#Some error makes max images possible to save=355
-area_weight=0.001# How GOOD more area is
+max_iters=10000
+save_interval=math.ceil(max_iters/100)#Some error makes max images possible to save=355
+area_weight=1#0.001# How GOOD more area is
 stiffness_weight=0.1
 Ix_ratio=1# used to convert Ix to [0,1]
 Iy_ratio=1# used to convert Iy to [0,1]
@@ -86,7 +86,7 @@ def calculate_ratios(columns):
 
     total_area=sum(areas)
     center_of_mass=calc_global_com(centroids,areas)
-    center_of_rigidity=calc_global_cor(Iys,Ixs,centroids)
+    #center_of_rigidity=calc_global_cor(Iys,Ixs,centroids)
     global_Ix=calc_global_Ix(Ixs,areas,centroids,center_of_mass)
     global_Iy=calc_global_Iy(Iys,areas,centroids,center_of_mass)
 
@@ -95,7 +95,7 @@ def calculate_ratios(columns):
     global Iy_ratio
     Iy_ratio=1/global_Iy
     global area_ratio
-    area_ratio=1/total_area**2
+    area_ratio=1/(total_area**2)
 
 # Calculates how good the structure is
 def error_func(columns,maxes,mines,iter):
@@ -124,7 +124,8 @@ def error_func(columns,maxes,mines,iter):
     ex=abs(center_of_mass[0]-center_of_rigidity[0])/global_rx# eccentricity
     ey=abs(center_of_mass[1]-center_of_rigidity[1])/global_ry# eccentricity
 
-    score_to_minimize=((e_sig(ex)+e_sig(ey))/2)/sigmoid((stiffness_weight*(global_Ix*Ix_ratio+global_Iy*Iy_ratio)/2),1)/(total_area**2*area_ratio*area_weight)
+    #score_to_minimize=(e_sig(ex)+e_sig(ey))/2
+    score_to_minimize=((e_sig(ex)+e_sig(ey))/2)/sigmoid((stiffness_weight*(global_Ix*Ix_ratio+global_Iy*Iy_ratio)/2),1)#/(total_area**2*area_ratio*area_weight)
 
     mse=score_to_minimize
     if(MODE=='AI'):
@@ -156,7 +157,7 @@ def sigmoid(x,a):
 
 # my weird eccentricity sigmoid 
 def e_sig(x):
-    return 1/(1+math.exp(-36*x+6))
+    return 1/(1+tf.math.exp(-36*x+6))
     
 def run_gradient_descent(columns, learning_rate,maximums,minimums,doc):
  
@@ -269,7 +270,7 @@ def get_Ry(b_box):
 # Check if b1 is inside b2
 def box_inside_box(b1,b2):
     #          x1        x1          y1      y1            x2         x2           y2      y2
-    return (b1[0][0]>b2[0][0] and b1[0][1]<b2[0][1] and b1[1][0]<b2[1][0] and b1[1][1]>b2[1][1])
+    return (b1[0][0]>=b2[0][0] and b1[0][1]<=b2[0][1] and b1[1][0]<=b2[1][0] and b1[1][1]>=b2[1][1])
 
 # Converts a bounding box to a list of 4 points
 def gen_points(b_box):
@@ -331,7 +332,7 @@ def save_columns_to_png(iter,cols,doc,loss):
         msp.delete_entity(line)
 
 # ------------ SCRIPT STARTS HERE ---------------
-path_to_file='./DXF/test_maxminonly.dxf'
+path_to_file='./DXF/C2.dxf'
 print("CWD: "+os.getcwd())
 # Safe loading procedure (requires ezdxf v0.14):
 try:
